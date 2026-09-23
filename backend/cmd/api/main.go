@@ -28,14 +28,14 @@ func main() {
 
 func apiServer(addr string) {
 	pool := postgresServer(context.Background())
-	r := internal.NewRouter()
+	defer pool.Close()
+	r := internal.NewRouter(pool)
 	server := &http.Server{
 		Addr:    addr,
 		Handler: r,
 	}
 	log.Printf("Starting server on %s", addr)
 	server.ListenAndServe()
-	defer pool.Close()
 }
 func postgresServer(ctx context.Context) *pgxpool.Pool {
 	databaseURL := fmt.Sprintf("postgres://%s:%s@localhost:5432/%s?sslmode=disable",
@@ -43,7 +43,6 @@ func postgresServer(ctx context.Context) *pgxpool.Pool {
 		os.Getenv("POSTGRES_PASSWORD"),
 		os.Getenv("POSTGRES_DB"),
 	)
-	log.Println(databaseURL)
 	pool, err := postgres.Open(ctx, databaseURL)
 	if err != nil {
 		log.Fatal(err)
