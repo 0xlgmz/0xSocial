@@ -30,10 +30,15 @@ func NewRouter(pool *pgxpool.Pool) http.Handler {
 			r.HandleFunc("POST /register", httpapi.Register(pool))
 			r.HandleFunc("POST /login", httpapi.Login(pool))
 
-			r.Group(func(r chi.Router) {
+			r.Route("/me", func(r chi.Router) {
 				r.Use(middleware0x.RequireAuth(pool))
-				r.HandleFunc("GET /me", httpapi.CurrentSession)
+
+				r.HandleFunc("GET /profile", httpapi.GetProfile(pool))
+				r.HandleFunc("PATCH /profile", httpapi.UpdateProfile(pool))
+				r.HandleFunc("GET /sessions", httpapi.ListSessions(pool))
+				r.HandleFunc("DELETE /sessions/{sessionID}", httpapi.RevokeSession(pool))
 			})
+
 		})
 	})
 	return r
