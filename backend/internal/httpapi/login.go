@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/auth"
+	"github.com/0xlgmz/proj-reactlang-fullstack/internal/ratelimit"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -17,8 +18,11 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-func Login(pool *pgxpool.Pool) http.HandlerFunc {
+func Login(pool *pgxpool.Pool, loginIPLimiter, loginEmailLimiter *ratelimit.Limiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if rateLimited(w, loginIPLimiter, clientIP(r)) {
+			return
+		}
 		var (
 			userID       int64
 			passwordHash string
@@ -36,6 +40,9 @@ func Login(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		emailNormalized := strings.ToLower(strings.TrimSpace(input.Email))
+		if rateLimited(w, loginEmailLimiter, emailNormalized) {
+			return
+		}
 
 		err := pool.QueryRow(
 			r.Context(),
@@ -67,10 +74,12 @@ func Login(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if status != "active" && status != "pending_verification" {
-			http.Error(w, "invalid email or password", http.StatusUnauthorized)
+		if status != "active" {
+			http.Error(w, "email verification required", http.StatusForbidden)
 			return
 		}
+
+		loginEmailLimiter.Reset(emailNormalized)
 
 		generateErr, sessionToken, expiresAt := generateSession(r, pool, userID)
 		if generateErr != nil {

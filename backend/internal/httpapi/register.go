@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"unicode"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/auth"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/postgres"
+	"github.com/0xlgmz/proj-reactlang-fullstack/internal/ratelimit"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,8 +20,11 @@ type registerRequest struct {
 	Password string `json:"password"`
 }
 
-func Register(pool *pgxpool.Pool) http.HandlerFunc {
+func Register(pool *pgxpool.Pool, registrationLimiter *ratelimit.Limiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if rateLimited(w, registrationLimiter, clientIP(r)) {
+			return
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, 4_096)
 
 		var input registerRequest
@@ -51,12 +57,32 @@ func Register(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Append to the database atomically.
-		err = postgres.InsertRegisteredUser(r.Context(), pool, emailNormalized, hashedPassword)
+		verificationToken, verificationTokenHash, err := auth.NewOpaqueToken()
 		if err != nil {
 			http.Error(w, "could not create account", http.StatusInternalServerError)
 			return
 		}
+
+		// Append to the database atomically.
+		err = postgres.InsertRegisteredUser(
+			r.Context(),
+			pool,
+			emailNormalized,
+			hashedPassword,
+			verificationTokenHash,
+		)
+
+		if errors.Is(err, postgres.ErrEmailAlreadyExists) {
+			http.Error(w, "an account with that email already exists", http.StatusConflict)
+			return
+		}
+
+		if err != nil {
+			http.Error(w, "could not create account", http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("New User: [%s] \n Token: [%s]", emailNormalized, verificationToken)
 		w.WriteHeader(http.StatusCreated)
 	}
 }

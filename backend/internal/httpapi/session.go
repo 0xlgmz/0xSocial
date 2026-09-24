@@ -37,5 +37,4 @@ func ListSessions(pool *pgxpool.Pool) http.HandlerFunc {
 }
 func RevokeSession(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {}
-
 }

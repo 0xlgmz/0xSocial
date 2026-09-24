@@ -49,7 +49,7 @@ func RequireAuth(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 				   AND s.revoked_at IS NULL
 				   AND s.expires_at > NOW()
 				   AND s.created_at >= u.sessions_valid_after
-				   AND u.status IN ('pending_verification', 'active')
+				   AND u.status = 'active'
 				   AND s.created_at + INTERVAL '30 days' > NOW()`,
 				auth.HashSessionToken(cookie.Value),
 			).Scan(
@@ -58,6 +58,8 @@ func RequireAuth(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 				&session.Email,
 				&session.Status,
 				&session.ExpiresAt,
+				&session.CreatedAt,
+				&session.LastSeenAt,
 			)
 
 			if errors.Is(err, pgx.ErrNoRows) {
