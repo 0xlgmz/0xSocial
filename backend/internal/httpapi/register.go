@@ -3,10 +3,12 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/auth"
+	"github.com/0xlgmz/proj-reactlang-fullstack/internal/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,8 +19,6 @@ type registerRequest struct {
 
 func Register(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_ = pool // We will use this in the next stage.
-
 		r.Body = http.MaxBytesReader(w, r.Body, 4_096)
 
 		var input registerRequest
@@ -50,14 +50,14 @@ func Register(pool *pgxpool.Pool) http.HandlerFunc {
 			http.Error(w, "failed to hash password", http.StatusInternalServerError)
 			return
 		}
-		// HTTP Reponse for successful registration with hashed password (for demonstration purposes).
-		w.WriteHeader(http.StatusCreated)
-		w.Header().Set("Content-Type", "application/json")
-		response := map[string]string{
-			"email":    emailNormalized,
-			"password": hashedPassword,
+
+		// Append to the database atomically.
+		err = postgres.InsertRegisteredUser(r.Context(), pool, emailNormalized, hashedPassword)
+		if err != nil {
+			http.Error(w, "could not create account", http.StatusInternalServerError)
+			return
 		}
-		json.NewEncoder(w).Encode(response)
+		w.WriteHeader(http.StatusCreated)
 	}
 }
 
@@ -73,18 +73,37 @@ func validateEmail(email string) bool {
 	return true
 }
 func validatePassword(password string) (bool, string) {
-	// Basic password validation logic.
-	if len(password) < 15 {
-		return false, "password must be at least 15 characters long"
-	}
-	// Check for maximum length to prevent abuse.
 	if len(password) > 1_024 {
-		return false, "password must not exceed 1024 characters"
+		return false, "password must not exceed 1024 bytes"
 	}
-	// Check for at least one special character in the password.
-	specialChar := regexp.MustCompile(`[!@#$%^&*(),.?":{}|<>]`)
-	if !specialChar.MatchString(password) {
-		return false, "password must contain at least one special character (@, #, $, %)"
+
+	length := utf8.RuneCountInString(password)
+
+	if length < 8 {
+		return false, "password must be at least 8 characters long"
 	}
+
+	// Long passwords/passphrases need no composition rules.
+	if length >= 15 {
+		return true, ""
+	}
+
+	var hasUppercase bool
+	var hasSymbol bool
+
+	for _, character := range password {
+		if unicode.IsUpper(character) {
+			hasUppercase = true
+		}
+
+		if unicode.IsPunct(character) || unicode.IsSymbol(character) {
+			hasSymbol = true
+		}
+	}
+
+	if !hasUppercase || !hasSymbol {
+		return false, "passwords shorter than 15 characters require an uppercase letter and a symbol"
+	}
+
 	return true, ""
 }
