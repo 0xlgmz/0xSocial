@@ -11,7 +11,7 @@ import (
 
 var ErrEmailAlreadyExists = errors.New("email already exists")
 
-func InsertRegisteredUser(ctx context.Context, pool *pgxpool.Pool, emailNormalized, hashedPassword string, verificationTokenHash []byte) error {
+func InsertRegisteredUser(ctx context.Context, pool *pgxpool.Pool, emailNormalized, hashedPassword string, verificationTokenHash []byte, ipAddress, userAgent string) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return errors.New("could not create account")
@@ -51,6 +51,16 @@ func InsertRegisteredUser(ctx context.Context, pool *pgxpool.Pool, emailNormaliz
 
 	_, err = tx.Exec(
 		ctx,
+		`INSERT INTO profiles (user_id)
+		VALUES ($1)`,
+		userID,
+	)
+	if err != nil {
+		return fmt.Errorf("create user profile: %w", err)
+	}
+
+	_, err = tx.Exec(
+		ctx,
 		`INSERT INTO auth_tokens (
 			user_id,
 			purpose,
@@ -68,6 +78,17 @@ func InsertRegisteredUser(ctx context.Context, pool *pgxpool.Pool, emailNormaliz
 	)
 	if err != nil {
 		return fmt.Errorf("insert verification token: %w", err)
+	}
+
+	event := AuthEvent{
+		UserID:    &userID,
+		EventType: AuthEventRegistrationSucceeded,
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
+	}
+
+	if err := InsertAuthEvent(ctx, tx, event); err != nil {
+		return fmt.Errorf("record registration event: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

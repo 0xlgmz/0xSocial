@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/auth"
+	"github.com/0xlgmz/proj-reactlang-fullstack/internal/postgres"
 )
 
 func (h *Handler) Logout() http.HandlerFunc {
@@ -12,16 +13,13 @@ func (h *Handler) Logout() http.HandlerFunc {
 		cookie, err := r.Cookie("__Host-session")
 
 		if err == nil {
-			_, err = h.pool.Exec(
+			err = postgres.LogoutSession(
 				r.Context(),
-				`UPDATE sessions
-				 SET revoked_at = NOW(),
-				     revoked_reason = 'user_logout'
-				 WHERE token_hash = $1
-				   AND revoked_at IS NULL`,
+				h.pool,
 				auth.HashSessionToken(cookie.Value),
+				clientIP(r),
+				r.UserAgent(),
 			)
-
 			if err != nil {
 				http.Error(w, "could not log out", http.StatusInternalServerError)
 				return

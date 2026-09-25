@@ -3,13 +3,13 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/auth"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/postgres"
-	"github.com/0xlgmz/proj-reactlang-fullstack/internal/ratelimit"
 )
 
 type emailVerification struct {
@@ -31,7 +31,21 @@ func (h *Handler) VerifyEmail() http.HandlerFunc {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		err := postgres.VerifyEmailToken(r.Context(), h.pool, input.Token)
+
+		sessionToken, sessionTokenHash, err := auth.NewSessionToken()
+		if err != nil {
+			http.Error(w, "could not verify email", http.StatusInternalServerError)
+			return
+		}
+
+		expiresAt, err := postgres.VerifyEmailAndCreateSession(
+			r.Context(),
+			h.pool,
+			input.Token,
+			sessionTokenHash,
+			clientIP(r),
+			r.UserAgent(),
+		)
 		if errors.Is(err, postgres.ErrInvalidVerificationToken) {
 			http.Error(
 				w,
@@ -45,13 +59,25 @@ func (h *Handler) VerifyEmail() http.HandlerFunc {
 			http.Error(w, "could not verify email", http.StatusInternalServerError)
 			return
 		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "__Host-session",
+			Value:    sessionToken,
+			Path:     "/",
+			Expires:  expiresAt,
+			MaxAge:   int(time.Until(expiresAt).Seconds()),
+			Secure:   true,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
-func (h *Handler) ResendEmailVerification(limiters ratelimit.IPAndEmailLimiters) http.HandlerFunc {
+func (h *Handler) ResendEmailVerification() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		if rateLimited(w, limiters.IP, clientIP(r)) {
+		if rateLimited(w, h.limiters.ResendVerification.IP, clientIP(r)) {
 			return
 		}
 
@@ -69,7 +95,7 @@ func (h *Handler) ResendEmailVerification(limiters ratelimit.IPAndEmailLimiters)
 
 		emailNormalized := strings.ToLower(strings.TrimSpace(input.Email))
 
-		if rateLimited(w, limiters.Email, emailNormalized) {
+		if rateLimited(w, h.limiters.ResendVerification.Email, emailNormalized) {
 			return
 		}
 
@@ -85,6 +111,8 @@ func (h *Handler) ResendEmailVerification(limiters ratelimit.IPAndEmailLimiters)
 				h.pool,
 				emailNormalized,
 				tokenHash,
+				clientIP(r),
+				r.UserAgent(),
 			)
 
 		if err != nil {
@@ -93,17 +121,18 @@ func (h *Handler) ResendEmailVerification(limiters ratelimit.IPAndEmailLimiters)
 		}
 
 		if shouldSend {
-			// Development only. Replace with mail delivery later.
-			log.Printf("verification email for %s: token=%s", email, rawToken)
+			if err := h.mailer.SendVerificationEmail(
+				r.Context(),
+				email,
+				rawToken,
+			); err != nil {
+				slog.Error(
+					"failed to resend verification email",
+					"error", err,
+				)
+			}
 		}
 
 		w.WriteHeader(http.StatusAccepted)
 	}
-}
-
-func (h *Handler) ForgotPassword() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {}
-}
-func (h *Handler) PasswordReset() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {}
 }

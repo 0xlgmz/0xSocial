@@ -1,6 +1,6 @@
 module github.com/0xlgmz/proj-reactlang-fullstack
 
-go 1.26.1
+go 1.27.1
 
 require (
 	github.com/alexedwards/argon2id v1.0.0

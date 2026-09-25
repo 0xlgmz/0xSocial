@@ -8,4 +8,15 @@ type Sender interface {
 		email string,
 		rawToken string,
 	) error
+
+	SendPasswordResetEmail(
+		ctx context.Context,
+		email string,
+		rawToken string,
+	) error
+
+	SendPasswordChangedEmail(
+		ctx context.Context,
+		email string,
+	) error
 }

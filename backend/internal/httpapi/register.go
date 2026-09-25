@@ -3,15 +3,12 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/auth"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/postgres"
-	"github.com/0xlgmz/proj-reactlang-fullstack/internal/ratelimit"
 )
 
 type registerRequest struct {
@@ -19,9 +16,9 @@ type registerRequest struct {
 	Password string `json:"password"`
 }
 
-func (h *Handler) Register(registrationLimiter *ratelimit.Limiter) http.HandlerFunc {
+func (h *Handler) Register() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if rateLimited(w, registrationLimiter, clientIP(r)) {
+		if rateLimited(w, h.limiters.Registration, clientIP(r)) {
 			return
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 4_096)
@@ -38,12 +35,12 @@ func (h *Handler) Register(registrationLimiter *ratelimit.Limiter) http.HandlerF
 		emailNormalized := strings.ToLower(strings.TrimSpace(input.Email))
 
 		// Your validation goes here.
-		validEmail := validateEmail(emailNormalized)
+		validEmail := auth.ValidateEmail(emailNormalized)
 		if !validEmail {
 			http.Error(w, "invalid email format", http.StatusBadRequest)
 			return
 		}
-		validPassword, passwordError := validatePassword(input.Password)
+		validPassword, passwordError := auth.ValidatePassword(input.Password)
 		if !validPassword {
 			http.Error(w, passwordError, http.StatusBadRequest)
 			return
@@ -69,6 +66,8 @@ func (h *Handler) Register(registrationLimiter *ratelimit.Limiter) http.HandlerF
 			emailNormalized,
 			hashedPassword,
 			verificationTokenHash,
+			clientIP(r),
+			r.UserAgent(),
 		)
 
 		if errors.Is(err, postgres.ErrEmailAlreadyExists) {
@@ -81,54 +80,16 @@ func (h *Handler) Register(registrationLimiter *ratelimit.Limiter) http.HandlerF
 			return
 		}
 
-		log.Printf("New User: [%s] \n Token: [%s]", emailNormalized, verificationToken)
+		if err := h.mailer.SendVerificationEmail(
+			r.Context(),
+			emailNormalized,
+			verificationToken,
+		); err != nil {
+			slog.Error(
+				"failed to send verification email",
+				"error", err,
+			)
+		}
 		w.WriteHeader(http.StatusCreated)
 	}
-}
-
-func validateEmail(email string) bool {
-	// Basic email validation logic.
-	if len(email) < 3 || len(email) > 254 {
-		return false
-	}
-	// Check for the presence of '@' symbol in the email.
-	if !strings.Contains(email, "@") {
-		return false
-	}
-	return true
-}
-func validatePassword(password string) (bool, string) {
-	if len(password) > 1_024 {
-		return false, "password must not exceed 1024 bytes"
-	}
-
-	length := utf8.RuneCountInString(password)
-
-	if length < 8 {
-		return false, "password must be at least 8 characters long"
-	}
-
-	// Long passwords/passphrases need no composition rules.
-	if length >= 15 {
-		return true, ""
-	}
-
-	var hasUppercase bool
-	var hasSymbol bool
-
-	for _, character := range password {
-		if unicode.IsUpper(character) {
-			hasUppercase = true
-		}
-
-		if unicode.IsPunct(character) || unicode.IsSymbol(character) {
-			hasSymbol = true
-		}
-	}
-
-	if !hasUppercase || !hasSymbol {
-		return false, "passwords shorter than 15 characters require an uppercase letter and a symbol"
-	}
-
-	return true, ""
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal"
+	"github.com/0xlgmz/proj-reactlang-fullstack/internal/mailer"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -29,12 +30,18 @@ func main() {
 func apiServer(addr string) {
 	pool := postgresServer(context.Background())
 	defer pool.Close()
-	r := internal.NewRouter(pool)
+
+	sender := mailer.NewLogSender()
+
+	r := internal.NewRouter(pool, sender)
+
 	server := &http.Server{
 		Addr:    addr,
 		Handler: r,
 	}
+
 	log.Printf("Starting server on %s", addr)
+
 	server.ListenAndServe()
 }
 func postgresServer(ctx context.Context) *pgxpool.Pool {
