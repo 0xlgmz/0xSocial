@@ -10,7 +10,6 @@ import (
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/auth"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/postgres"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/ratelimit"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type emailVerification struct {
@@ -20,7 +19,7 @@ type resendVerificationRequest struct {
 	Email string `json:"email"`
 }
 
-func VerifyEmail(pool *pgxpool.Pool) http.HandlerFunc {
+func (h *Handler) VerifyEmail() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 4_096)
 
@@ -32,7 +31,7 @@ func VerifyEmail(pool *pgxpool.Pool) http.HandlerFunc {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		err := postgres.VerifyEmailToken(r.Context(), pool, input.Token)
+		err := postgres.VerifyEmailToken(r.Context(), h.pool, input.Token)
 		if errors.Is(err, postgres.ErrInvalidVerificationToken) {
 			http.Error(
 				w,
@@ -49,11 +48,10 @@ func VerifyEmail(pool *pgxpool.Pool) http.HandlerFunc {
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
-
-func ResendEmailVerification(pool *pgxpool.Pool, resendIPLimiter, resendEmailLimiter *ratelimit.Limiter) http.HandlerFunc {
+func (h *Handler) ResendEmailVerification(limiters ratelimit.IPAndEmailLimiters) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		if rateLimited(w, resendIPLimiter, clientIP(r)) {
+		if rateLimited(w, limiters.IP, clientIP(r)) {
 			return
 		}
 
@@ -71,7 +69,7 @@ func ResendEmailVerification(pool *pgxpool.Pool, resendIPLimiter, resendEmailLim
 
 		emailNormalized := strings.ToLower(strings.TrimSpace(input.Email))
 
-		if rateLimited(w, resendEmailLimiter, emailNormalized) {
+		if rateLimited(w, limiters.Email, emailNormalized) {
 			return
 		}
 
@@ -81,14 +79,31 @@ func ResendEmailVerification(pool *pgxpool.Pool, resendIPLimiter, resendEmailLim
 			return
 		}
 
+		email, shouldSend, err :=
+			postgres.ReplaceEmailVerificationToken(
+				r.Context(),
+				h.pool,
+				emailNormalized,
+				tokenHash,
+			)
+
 		if err != nil {
 			http.Error(w, "could not process request", http.StatusInternalServerError)
 			return
 		}
 
-		log.Println("raw: [%s] \ntokenHash: [%s]", rawToken, tokenHash)
-		// Always return the same response.
-		w.WriteHeader(http.StatusAccepted)
+		if shouldSend {
+			// Development only. Replace with mail delivery later.
+			log.Printf("verification email for %s: token=%s", email, rawToken)
+		}
 
+		w.WriteHeader(http.StatusAccepted)
 	}
+}
+
+func (h *Handler) ForgotPassword() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {}
+}
+func (h *Handler) PasswordReset() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {}
 }

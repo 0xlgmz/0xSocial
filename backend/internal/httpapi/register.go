@@ -12,7 +12,6 @@ import (
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/auth"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/postgres"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/ratelimit"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type registerRequest struct {
@@ -20,7 +19,7 @@ type registerRequest struct {
 	Password string `json:"password"`
 }
 
-func Register(pool *pgxpool.Pool, registrationLimiter *ratelimit.Limiter) http.HandlerFunc {
+func (h *Handler) Register(registrationLimiter *ratelimit.Limiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if rateLimited(w, registrationLimiter, clientIP(r)) {
 			return
@@ -66,7 +65,7 @@ func Register(pool *pgxpool.Pool, registrationLimiter *ratelimit.Limiter) http.H
 		// Append to the database atomically.
 		err = postgres.InsertRegisteredUser(
 			r.Context(),
-			pool,
+			h.pool,
 			emailNormalized,
 			hashedPassword,
 			verificationTokenHash,

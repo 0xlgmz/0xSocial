@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/middleware0x"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func CurrentSession(w http.ResponseWriter, r *http.Request) {
@@ -32,9 +31,9 @@ func sessionFromContext(r *http.Request) (middleware0x.AuthenticatedSession, boo
 	return session, ok
 }
 
-func ListSessions(pool *pgxpool.Pool) http.HandlerFunc {
+func (h *Handler) ListSessions() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {}
 }
-func RevokeSession(pool *pgxpool.Pool) http.HandlerFunc {
+func (h *Handler) RevokeSession() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {}
 }

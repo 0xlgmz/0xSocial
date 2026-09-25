@@ -5,15 +5,14 @@ import (
 	"time"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/auth"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func Logout(pool *pgxpool.Pool) http.HandlerFunc {
+func (h *Handler) Logout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("__Host-session")
 
 		if err == nil {
-			_, err = pool.Exec(
+			_, err = h.pool.Exec(
 				r.Context(),
 				`UPDATE sessions
 				 SET revoked_at = NOW(),

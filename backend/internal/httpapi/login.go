@@ -18,9 +18,9 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-func Login(pool *pgxpool.Pool, loginIPLimiter, loginEmailLimiter *ratelimit.Limiter) http.HandlerFunc {
+func (h *Handler) Login(limiters ratelimit.IPAndEmailLimiters) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if rateLimited(w, loginIPLimiter, clientIP(r)) {
+		if rateLimited(w, limiters.IP, clientIP(r)) {
 			return
 		}
 		var (
@@ -40,11 +40,11 @@ func Login(pool *pgxpool.Pool, loginIPLimiter, loginEmailLimiter *ratelimit.Limi
 		}
 
 		emailNormalized := strings.ToLower(strings.TrimSpace(input.Email))
-		if rateLimited(w, loginEmailLimiter, emailNormalized) {
+		if rateLimited(w, limiters.Email, emailNormalized) {
 			return
 		}
 
-		err := pool.QueryRow(
+		err := h.pool.QueryRow(
 			r.Context(),
 			`SELECT u.id, pc.password_hash, u.status
 			FROM users u
@@ -79,9 +79,9 @@ func Login(pool *pgxpool.Pool, loginIPLimiter, loginEmailLimiter *ratelimit.Limi
 			return
 		}
 
-		loginEmailLimiter.Reset(emailNormalized)
+		limiters.Email.Reset(emailNormalized)
 
-		generateErr, sessionToken, expiresAt := generateSession(r, pool, userID)
+		generateErr, sessionToken, expiresAt := generateSession(r, h.pool, userID)
 		if generateErr != nil {
 			http.Error(w, generateErr.Error(), http.StatusInternalServerError)
 			return

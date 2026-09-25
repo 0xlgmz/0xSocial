@@ -2,7 +2,6 @@ package internal
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/httpapi"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/middleware0x"
@@ -18,14 +17,12 @@ func NewRouter(pool *pgxpool.Pool) http.Handler {
 		panic(err)
 	}
 
+	handlers := httpapi.NewHandler(pool)
+	limiters := ratelimit.NewAuthLimiters()
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(csrf.Handler)
-	registrationLimiter := ratelimit.New(10, time.Hour)
-	loginIPLimiter := ratelimit.New(20, time.Minute)
-	loginEmailLimiter := ratelimit.New(5, 15*time.Minute)
-	resendIPLimiter := ratelimit.New(5, time.Hour)
-	resendEmailLimiter := ratelimit.New(3, time.Hour)
 
 	// Routing GET requests
 	r.Route("/api", func(r chi.Router) {
@@ -33,19 +30,20 @@ func NewRouter(pool *pgxpool.Pool) http.Handler {
 
 		// Routing Authentication related
 		r.Route("/auth", func(r chi.Router) {
-			r.HandleFunc("POST /logout", httpapi.Logout(pool))
-			r.HandleFunc("POST /register", httpapi.Register(pool, registrationLimiter))
-			r.HandleFunc("POST /login", httpapi.Login(pool, loginIPLimiter, loginEmailLimiter))
-			r.HandleFunc("POST /verify-email", httpapi.VerifyEmail(pool))
-			r.HandleFunc("POST /resend-verification", httpapi.ResendEmailVerification(pool, resendIPLimiter, resendEmailLimiter))
+			r.HandleFunc("POST /logout", handlers.Logout())
+			r.HandleFunc("POST /register", handlers.Register(limiters.Registration))
+			r.HandleFunc("POST /login", handlers.Login(limiters.Login))
+			r.HandleFunc("POST /verify-email", handlers.VerifyEmail())
+			r.HandleFunc("POST /resend-verification", handlers.ResendEmailVerification(limiters.ResendVerification))
+			r.HandleFunc("POST /forgot-password", handlers.ForgotPassword())
 
 			r.Route("/me", func(r chi.Router) {
 				r.Use(middleware0x.RequireAuth(pool))
 
-				r.HandleFunc("GET /profile", httpapi.GetProfile(pool))
-				r.HandleFunc("PATCH /profile", httpapi.UpdateProfile(pool))
-				r.HandleFunc("GET /sessions", httpapi.ListSessions(pool))
-				r.HandleFunc("DELETE /sessions/{sessionID}", httpapi.RevokeSession(pool))
+				r.HandleFunc("GET /profile", handlers.GetProfile())
+				r.HandleFunc("PATCH /profile", handlers.UpdateProfile())
+				r.HandleFunc("GET /sessions", handlers.ListSessions())
+				r.HandleFunc("DELETE /sessions/{sessionID}", handlers.RevokeSession())
 			})
 
 		})
