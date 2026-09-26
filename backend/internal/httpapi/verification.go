@@ -21,6 +21,9 @@ type resendVerificationRequest struct {
 
 func (h *Handler) VerifyEmail() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if rateLimited(w, h.limiters.VerifyEmail, clientIP(r)) {
+			return
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, 4_096)
 
 		var input emailVerification
@@ -71,6 +74,7 @@ func (h *Handler) VerifyEmail() http.HandlerFunc {
 			SameSite: http.SameSiteLaxMode,
 		})
 
+		h.limiters.VerifyEmail.Reset(clientIP(r))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

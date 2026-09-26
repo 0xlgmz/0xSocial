@@ -6,12 +6,14 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrEmailAlreadyExists = errors.New("email already exists")
+var ErrHandleAlreadyExists = errors.New("handle already exists")
 
-func InsertRegisteredUser(ctx context.Context, pool *pgxpool.Pool, emailNormalized, hashedPassword string, verificationTokenHash []byte, ipAddress, userAgent string) error {
+func InsertRegisteredUser(ctx context.Context, pool *pgxpool.Pool, emailNormalized, userHandle, hashedPassword string, verificationTokenHash []byte, ipAddress, userAgent string) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return errors.New("could not create account")
@@ -51,11 +53,20 @@ func InsertRegisteredUser(ctx context.Context, pool *pgxpool.Pool, emailNormaliz
 
 	_, err = tx.Exec(
 		ctx,
-		`INSERT INTO profiles (user_id)
-		VALUES ($1)`,
+		`INSERT INTO profiles (user_id, handle)
+		VALUES ($1, $2)`,
 		userID,
+		userHandle,
 	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) &&
+			pgErr.Code == "23505" &&
+			pgErr.ConstraintName == "profiles_handle_key" {
+			return ErrHandleAlreadyExists
+		}
+
 		return fmt.Errorf("create user profile: %w", err)
 	}
 

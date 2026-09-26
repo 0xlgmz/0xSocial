@@ -3,6 +3,7 @@ package httpapi
 import (
 	"log/slog"
 	"net/http"
+	"regexp"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/mailer"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/postgres"
@@ -46,4 +47,9 @@ func (h *Handler) recordAuthEventBestEffort(r *http.Request, event postgres.Auth
 			"error", err,
 		)
 	}
+}
+
+func validateHandle(handle string) bool {
+	var handlePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{2,29}$`)
+	return handlePattern.MatchString(handle)
 }

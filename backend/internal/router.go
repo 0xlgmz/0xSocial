@@ -27,6 +27,10 @@ func NewRouter(pool *pgxpool.Pool, sender mailer.Sender) http.Handler {
 	r.Route("/api", func(r chi.Router) {
 		r.HandleFunc("GET /health", httpapi.Health)
 
+		r.Route("/profiles", func(r chi.Router) {
+			r.HandleFunc("GET /{handle}", handlers.GetUserPublicProfile())
+		})
+
 		// Routing Authentication related
 		r.Route("/auth", func(r chi.Router) {
 			r.HandleFunc("POST /logout", handlers.Logout())

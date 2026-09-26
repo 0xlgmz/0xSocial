@@ -14,6 +14,7 @@ import (
 type registerRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Handle   string `json:"handle"`
 }
 
 func (h *Handler) Register() http.HandlerFunc {
@@ -59,11 +60,19 @@ func (h *Handler) Register() http.HandlerFunc {
 			return
 		}
 
+		handle := strings.ToLower(strings.TrimSpace(input.Handle))
+		validHandle := validateHandle(handle)
+		if !validHandle {
+			http.Error(w, "handle is already taken", http.StatusBadRequest)
+			return
+		}
+
 		// Append to the database atomically.
 		err = postgres.InsertRegisteredUser(
 			r.Context(),
 			h.pool,
 			emailNormalized,
+			handle,
 			hashedPassword,
 			verificationTokenHash,
 			clientIP(r),
@@ -72,6 +81,10 @@ func (h *Handler) Register() http.HandlerFunc {
 
 		if errors.Is(err, postgres.ErrEmailAlreadyExists) {
 			http.Error(w, "an account with that email already exists", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, postgres.ErrHandleAlreadyExists) {
+			http.Error(w, "that handle is already taken", http.StatusConflict)
 			return
 		}
 

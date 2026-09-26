@@ -58,6 +58,9 @@ func (h *Handler) ListSessions() http.HandlerFunc {
 			http.Error(w, "not authenticated", http.StatusUnauthorized)
 			return
 		}
+		if rateLimited(w, h.limiters.GetProfile, clientIP(r)) {
+			return
+		}
 
 		sessions, err := postgres.ListUserSessions(
 			r.Context(),
@@ -95,6 +98,7 @@ func (h *Handler) ListSessions() http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			return
 		}
+		h.limiters.GetProfile.Reset(clientIP(r))
 	}
 }
 func (h *Handler) RevokeSession() http.HandlerFunc {
@@ -102,6 +106,9 @@ func (h *Handler) RevokeSession() http.HandlerFunc {
 		currentSession, ok := sessionFromContext(r)
 		if !ok {
 			http.Error(w, "not authenticated", http.StatusUnauthorized)
+			return
+		}
+		if rateLimited(w, h.limiters.DeleteSession, clientIP(r)) {
 			return
 		}
 
@@ -147,6 +154,8 @@ func (h *Handler) RevokeSession() http.HandlerFunc {
 				SameSite: http.SameSiteLaxMode,
 			})
 		}
+
+		h.limiters.DeleteSession.Reset(clientIP(r))
 
 		w.WriteHeader(http.StatusNoContent)
 	}

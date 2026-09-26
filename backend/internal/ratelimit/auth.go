@@ -16,7 +16,11 @@ type AuthLimiters struct {
 	Login              IPAndEmailLimiters
 	ResendVerification IPAndEmailLimiters
 	ForgotPassword     IPAndEmailLimiters
+	DeleteSession      *Limiter
+	VerifyEmail        *Limiter
 	PasswordReset      *Limiter
+	GetProfile         *Limiter
+	UpdateProfile      *Limiter
 }
 
 func NewAuthLimiters() AuthLimiters {
@@ -34,6 +38,10 @@ func NewAuthLimiters() AuthLimiters {
 			IP:    New(5, time.Hour),
 			Email: New(3, time.Hour),
 		},
-		PasswordReset: New(10, 15*time.Minute),
+		DeleteSession: New(20, time.Hour),
+		VerifyEmail:   New(10, 20*time.Minute),
+		PasswordReset: New(10, 30*time.Minute),
+		GetProfile:    New(20, time.Minute),
+		UpdateProfile: New(20, time.Hour),
 	}
 }
