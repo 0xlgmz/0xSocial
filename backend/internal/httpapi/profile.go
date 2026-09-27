@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -23,16 +24,22 @@ type profileResponse struct {
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 	SessionExpiresAt time.Time `json:"sessionExpiresAt"`
+	PostCount        int64     `json:"postCount"`
+	FollowerCount    int64     `json:"followerCount"`
+	FollowingCount   int64     `json:"followingCount"`
 }
 type updateProfileRequest struct {
 	DisplayName *string `json:"displayName"`
 	Bio         *string `json:"bio"`
 }
 type publicProfileResponse struct {
-	Handle      string  `json:"handle"`
-	DisplayName string  `json:"displayName"`
-	Bio         string  `json:"bio"`
-	AvatarURL   *string `json:"avatarUrl"`
+	Handle         string  `json:"handle"`
+	DisplayName    string  `json:"displayName"`
+	Bio            string  `json:"bio"`
+	AvatarURL      *string `json:"avatarUrl"`
+	PostCount      int64   `json:"postCount"`
+	FollowerCount  int64   `json:"followerCount"`
+	FollowingCount int64   `json:"followingCount"`
 }
 
 func (h *Handler) GetProfile() http.HandlerFunc {
@@ -42,7 +49,7 @@ func (h *Handler) GetProfile() http.HandlerFunc {
 			http.Error(w, "not authenticated", http.StatusUnauthorized)
 			return
 		}
-		if rateLimited(w, h.limiters.GetProfile, clientIP(r)) {
+		if rateLimited(w, h.limiters.GetProfile, strconv.FormatInt(session.UserID, 10)) {
 			return
 		}
 
@@ -67,6 +74,9 @@ func (h *Handler) GetProfile() http.HandlerFunc {
 			CreatedAt:        profile.CreatedAt,
 			UpdatedAt:        profile.UpdatedAt,
 			SessionExpiresAt: session.ExpiresAt,
+			PostCount:        profile.PostCount,
+			FollowerCount:    profile.FollowerCount,
+			FollowingCount:   profile.FollowingCount,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -74,7 +84,6 @@ func (h *Handler) GetProfile() http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			return
 		}
-		h.limiters.GetProfile.Reset(clientIP(r))
 	}
 }
 func (h *Handler) UpdateProfile() http.HandlerFunc {
@@ -84,7 +93,7 @@ func (h *Handler) UpdateProfile() http.HandlerFunc {
 			http.Error(w, "not authenticated", http.StatusUnauthorized)
 			return
 		}
-		if rateLimited(w, h.limiters.UpdateProfile, clientIP(r)) {
+		if rateLimited(w, h.limiters.UpdateProfile, strconv.FormatInt(session.UserID, 10)) {
 			return
 		}
 
@@ -149,6 +158,9 @@ func (h *Handler) UpdateProfile() http.HandlerFunc {
 			CreatedAt:        profile.CreatedAt,
 			UpdatedAt:        profile.UpdatedAt,
 			SessionExpiresAt: session.ExpiresAt,
+			PostCount:        profile.PostCount,
+			FollowerCount:    profile.FollowerCount,
+			FollowingCount:   profile.FollowingCount,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -156,13 +168,12 @@ func (h *Handler) UpdateProfile() http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			return
 		}
-		h.limiters.GetProfile.Reset(clientIP(r))
 	}
 }
 
 func (h *Handler) GetUserPublicProfile() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if rateLimited(w, h.limiters.GetProfile, clientIP(r)) {
+		if rateLimited(w, h.limiters.GetPublicProfile, clientIP(r)) {
 			return
 		}
 		profile, err := postgres.GetUserPublicProfile(
@@ -180,10 +191,13 @@ func (h *Handler) GetUserPublicProfile() http.HandlerFunc {
 		}
 
 		response := publicProfileResponse{
-			Handle:      profile.Handle,
-			DisplayName: profile.DisplayName,
-			Bio:         profile.Bio,
-			AvatarURL:   profile.AvatarURL,
+			Handle:         profile.Handle,
+			DisplayName:    profile.DisplayName,
+			Bio:            profile.Bio,
+			AvatarURL:      profile.AvatarURL,
+			PostCount:      profile.PostCount,
+			FollowerCount:  profile.FollowerCount,
+			FollowingCount: profile.FollowingCount,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -191,6 +205,5 @@ func (h *Handler) GetUserPublicProfile() http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			return
 		}
-		h.limiters.GetProfile.Reset(clientIP(r))
 	}
 }

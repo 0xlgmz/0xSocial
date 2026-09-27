@@ -67,7 +67,7 @@ func (h *Handler) ForgotPassword() http.HandlerFunc {
 				rawToken,
 			); err != nil {
 				slog.Error(
-					"failed to resend verification email",
+					"failed to send password reset email",
 					"error", err,
 				)
 			}

@@ -1,57 +1,55 @@
-export type LoginRequest = {
+import { request } from './client'
+export { ApiError } from './client'
+
+export type Profile = {
+  id: number
   email: string
-  password: string
+  status: string
+  handle: string
+  displayName: string
+  bio: string
+  avatarUrl: string | null
+  postCount: number
+  followerCount: number
+  followingCount: number
+  createdAt: string
+  updatedAt: string
+  sessionExpiresAt: string
 }
 
-export type Session = {
+export type UpdateProfileInput = {
+  displayName: string
+  bio: string
+}
+
+export type RegisterInput = {
   email: string
-  status: 'pending_verification' | 'active'
+  password: string
+  handle: string
+}
+
+export type UserSession = {
+  id: number
+  current: boolean
+  userAgent: string
+  ipAddress: string
+  authMethod: string
+  riskLevel: string
+  createdAt: string
+  lastSeenAt: string
   expiresAt: string
 }
 
-export async function login(input: LoginRequest): Promise<void> {
-  const response = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-    body: JSON.stringify(input),
-  })
-
-  if (response.status === 401) {
-    throw new Error('Invalid email or password')
-  }
-
-  if (!response.ok) {
-    throw new Error('Unable to log in right now')
-  }
-}
-
-export async function logout(): Promise<void> {
-  const response = await fetch('/api/auth/logout', {
-    method: 'POST',
-    credentials: 'include',
-  })
-
-  if (!response.ok) {
-    throw new Error('Unable to log out right now')
-  }
-}
-
-export async function getSession(signal?: AbortSignal): Promise<Session | null> {
-  const response = await fetch('/api/auth/me', {
-    credentials: 'include',
-    signal,
-  })
-
-  if (response.status === 401) {
-    return null
-  }
-
-  if (!response.ok) {
-    throw new Error('Unable to check your session')
-  }
-
-  return response.json() as Promise<Session>
+export const authApi = {
+  profile: (signal?: AbortSignal) => request<Profile>('/api/auth/me/profile', { method: 'GET', signal }),
+  updateProfile: (input: UpdateProfileInput) => request<Profile>('/api/auth/me/profile', { method: 'PATCH', body: input, authenticated: true }),
+  register: (input: RegisterInput) => request<void>('/api/auth/register', { body: input }),
+  login: (email: string, password: string) => request<void>('/api/auth/login', { body: { email, password } }),
+  logout: () => request<void>('/api/auth/logout', { authenticated: true }),
+  verifyEmail: (token: string) => request<void>('/api/auth/verify-email', { body: { token } }),
+  resendVerification: (email: string) => request<void>('/api/auth/resend-verification', { body: { email } }),
+  forgotPassword: (email: string) => request<void>('/api/auth/forgot-password', { body: { email } }),
+  resetPassword: (token: string, password: string) => request<void>('/api/auth/reset-password', { body: { token, password } }),
+  sessions: () => request<{ sessions: UserSession[] }>('/api/auth/me/sessions', { method: 'GET', authenticated: true }),
+  revokeSession: (sessionId: number) => request<void>(`/api/auth/me/sessions/${sessionId}`, { method: 'DELETE', authenticated: true }),
 }

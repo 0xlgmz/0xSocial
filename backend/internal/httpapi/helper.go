@@ -6,24 +6,30 @@ import (
 	"regexp"
 
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/mailer"
+	"github.com/0xlgmz/proj-reactlang-fullstack/internal/media"
+	"github.com/0xlgmz/proj-reactlang-fullstack/internal/monetization"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/postgres"
 	"github.com/0xlgmz/proj-reactlang-fullstack/internal/ratelimit"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler struct {
-	pool     *pgxpool.Pool
-	limiters ratelimit.AuthLimiters
-	events   *postgres.AuthEventRecorder
-	mailer   mailer.Sender
+	pool         *pgxpool.Pool
+	limiters     ratelimit.AuthLimiters
+	events       *postgres.AuthEventRecorder
+	mailer       mailer.Sender
+	media        media.Store
+	monetization monetization.Config
 }
 
-func NewHandler(pool *pgxpool.Pool, sender mailer.Sender) *Handler {
+func NewHandler(pool *pgxpool.Pool, sender mailer.Sender, mediaStore media.Store, monetizationConfig monetization.Config) *Handler {
 	return &Handler{
-		pool:     pool,
-		limiters: ratelimit.NewAuthLimiters(),
-		events:   postgres.NewAuthEventRecorder(pool),
-		mailer:   sender,
+		pool:         pool,
+		limiters:     ratelimit.NewAuthLimiters(),
+		events:       postgres.NewAuthEventRecorder(pool),
+		mailer:       sender,
+		media:        mediaStore,
+		monetization: monetizationConfig,
 	}
 }
 

@@ -74,7 +74,6 @@ func (h *Handler) VerifyEmail() http.HandlerFunc {
 			SameSite: http.SameSiteLaxMode,
 		})
 
-		h.limiters.VerifyEmail.Reset(clientIP(r))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

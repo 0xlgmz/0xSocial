@@ -1,0 +1,71 @@
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: 1.25rem;
+  letter-spacing: -.045em;
+}
+
+.brand-logo span {
+  display: grid;
+  min-width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: .55rem;
+  background: #17231c;
+  color: white;
+  font-family: 'DM Mono', monospace;
+  font-size: .72rem;
+  font-weight: 500;
+}
+
+.brand-logo.text-white span { background: white; color: #16241c; }
+.brand-logo strong { font-weight: 700; }
+.brand-panel { position: sticky; top: 0; padding: 3.5rem; }
+.welcome-brand { padding-bottom: 2.5rem; }
+
+.brand-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(1px);
+  pointer-events: none;
+}
+
+.brand-orb-one {
+  width: 34rem;
+  height: 34rem;
+  right: -16rem;
+  top: 7%;
+  background: radial-gradient(circle at 32% 32%, rgba(53, 175, 116, .42), rgba(53, 175, 116, 0) 68%);
+}
+
+.brand-orb-two {
+  width: 26rem;
+  height: 26rem;
+  left: -10rem;
+  bottom: -10rem;
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 0 0 4rem rgba(255, 255, 255, .018), 0 0 0 8rem rgba(255, 255, 255, .012);
+}
+
+.feed-mark {
+  display: grid;
+  width: 6rem;
+  height: 6rem;
+  place-items: center;
+  margin-bottom: .5rem;
+  border-radius: 2rem;
+  color: var(--color-primary);
+  font-size: 2rem;
+  background: linear-gradient(145deg, color-mix(in oklab, var(--color-primary) 16%, white), color-mix(in oklab, var(--color-primary) 5%, white));
+  transform: rotate(-4deg);
+}
+
+.feed-mark svg { transform: rotate(4deg); }
+.dock { height: calc(4.5rem + env(safe-area-inset-bottom)); }
+.dock button { min-width: 4rem; min-height: 44px; }
+
+@media (min-width: 1024px) {
+  .brand-panel { height: 100vh; }
+  .welcome-brand { padding: 3.5rem; }
+}
