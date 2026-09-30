@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { ConnectionError } from '../components/layout/ConnectionError'
 import { LoadingScreen } from '../components/layout/LoadingScreen'
 import { useAuth } from '../features/auth/useAuth'
+import { getDocumentTitle } from '../lib/documentTitle'
 import { normalizeHandle } from '../lib/handle'
 import { getCurrentRoute, legalRoutes, navigate, privateRoutes, publicRoutes, redirect } from '../lib/routes'
 import type { LegalRoute, PrivateRoute, PublicRoute, ResolvedRoute } from '../lib/routes'
@@ -33,6 +34,10 @@ export function AppRouter() {
     window.addEventListener('popstate', handleRoute)
     return () => window.removeEventListener('popstate', handleRoute)
   }, [])
+
+  useEffect(() => {
+    document.title = getDocumentTitle(route)
+  }, [route])
 
   useEffect(() => {
     if (

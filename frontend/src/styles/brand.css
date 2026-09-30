@@ -1,26 +1,20 @@
 .brand-logo {
-  display: inline-flex;
-  align-items: center;
-  gap: .45rem;
-  font-size: 1.25rem;
-  letter-spacing: -.045em;
-}
-
-.brand-logo span {
-  display: grid;
-  min-width: 2rem;
+  display: block;
+  width: 2rem;
   height: 2rem;
-  place-items: center;
-  border-radius: .55rem;
-  background: #17231c;
-  color: white;
-  font-family: 'DM Mono', monospace;
-  font-size: .72rem;
-  font-weight: 500;
+  flex: 0 0 auto;
 }
 
-.brand-logo.text-white span { background: white; color: #16241c; }
-.brand-logo strong { font-weight: 700; }
+.brand-logo-background {
+  fill: #17231c;
+}
+
+.brand-logo-glyph {
+  fill: #fff;
+}
+
+.brand-logo-light .brand-logo-background { fill: #fff; }
+.brand-logo-light .brand-logo-glyph { fill: #17231c; }
 .brand-panel { position: sticky; top: 0; padding: 3.5rem; }
 .welcome-brand { padding-bottom: 2.5rem; }
 

@@ -17,7 +17,7 @@ const pageSize = 20
 
 export function FeedPage() {
   const { profile, refreshProfile, clearSession } = useAuth()
-  const { config, canRequestAds } = useMonetization()
+  const { config, status: monetizationStatus } = useMonetization()
   const [posts, setPosts] = useState<SocialPost[]>([])
   const [nextCursor, setNextCursor] = useState<number>()
   const [loading, setLoading] = useState(true)
@@ -76,7 +76,7 @@ export function FeedPage() {
         ) : posts.length === 0 ? (
           <section className="card border border-base-300 bg-base-100 shadow-sm"><div className="card-body items-center py-16 text-center"><span className="grid size-16 place-items-center rounded-full bg-primary/10 text-2xl text-primary"><FontAwesomeIcon icon={faCompass}/></span><h2 className="mt-3 text-xl font-semibold">Your feed is empty</h2><p className="max-w-sm text-sm leading-6 text-base-content/50">Follow some people or create your first post.</p><div className="mt-2 flex gap-2"><button className="btn btn-outline btn-sm" onClick={() => navigate('/explore')}>Explore people</button><button className="btn btn-primary btn-sm" onClick={() => navigate('/create')}>Create post</button></div></div></section>
         ) : (
-          <div className="flex flex-col gap-3">{canRequestAds
+          <div className="flex flex-col gap-3">{monetizationStatus === 'enabled' && config.placements.feed.enabled
             ? interleaveFeedAds(
                 posts,
                 config.placements.feed,

@@ -1,6 +1,7 @@
 package media
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -190,6 +191,28 @@ func (store *R2Store) DeleteObject(ctx context.Context, objectKey string) error 
 	}
 
 	return nil
+}
+
+// PutObjectIfAbsent uploads an object for internal tooling such as the data
+// seeder. It never overwrites existing user content.
+func (store *R2Store) PutObjectIfAbsent(ctx context.Context, objectKey, contentType string, body []byte) (bool, error) {
+	_, err := store.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:        aws.String(store.bucket),
+		Key:           aws.String(objectKey),
+		ContentType:   aws.String(contentType),
+		ContentLength: aws.Int64(int64(len(body))),
+		IfNoneMatch:   aws.String("*"),
+		Body:          bytes.NewReader(body),
+	})
+	if err != nil {
+		var apiError smithy.APIError
+		if errors.As(err, &apiError) &&
+			(apiError.ErrorCode() == "PreconditionFailed" || apiError.ErrorCode() == "ConditionalRequestConflict") {
+			return false, nil
+		}
+		return false, fmt.Errorf("upload R2 object: %w", err)
+	}
+	return true, nil
 }
 
 func (store *R2Store) PublicURL(objectKey string) string {

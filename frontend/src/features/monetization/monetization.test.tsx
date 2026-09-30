@@ -4,8 +4,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { disabledMonetizationConfig, normalizeMonetizationConfig } from '../../api/monetization'
 import type { FeedAdPlacement } from '../../api/monetization'
 import { FeedAdCard } from '../../components/ads/FeedAdCard'
+import { AdSenseScript } from './AdSenseScript'
 import { ensureAdSenseScript } from './adsense-script-state'
 import { interleaveFeedAds } from './interleaveFeedAds'
+import { MonetizationContext } from './monetization-context'
 
 const placement: FeedAdPlacement = {
   enabled: true,
@@ -77,6 +79,31 @@ describe('feed interleaving', () => {
 })
 
 describe('AdSense lifecycle', () => {
+  it('loads the AdSense tag while consent is still being resolved', async () => {
+    const config = normalizeMonetizationConfig({
+      enabled: true,
+      clientId: 'ca-pub-1234567890123456',
+      placements: { feed: placement },
+    })
+
+    render(
+      <MonetizationContext.Provider value={{
+        config,
+        status: 'enabled',
+        consentStatus: 'checking',
+        canRequestAds: false,
+        openPrivacyChoices: () => false,
+      }}>
+        <AdSenseScript/>
+      </MonetizationContext.Provider>,
+    )
+
+    await waitFor(() => {
+      const script = document.querySelector<HTMLScriptElement>('script[data-0xsocial-adsense]')
+      expect(script?.src).toContain('client=ca-pub-1234567890123456')
+    })
+  })
+
   it('adds the script and requests a mounted unit only once under StrictMode and rerenders', async () => {
     ensureAdSenseScript('ca-pub-1234567890123456')
     ensureAdSenseScript('ca-pub-1234567890123456')

@@ -54,7 +54,7 @@ services:
       - ./backend:/app
       - go_modules:/go/pkg/mod
       - go_build_cache:/root/.cache/go-build
-    command: go run ./cmd/api
+    command: ["go", "run", "./cmd/api"]
     expose:
       - "8080"
     environment:

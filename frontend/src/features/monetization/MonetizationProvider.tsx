@@ -7,8 +7,9 @@ import type { ConsentStatus, MonetizationStatus } from './monetization-context'
 
 type TcData = { eventStatus?: string; gdprApplies?: boolean; tcString?: string }
 type TcfApi = (command: string, version: number, callback: (data: TcData, success: boolean) => void) => void
+type GoogleFcCallback = Record<string, () => void> | (() => void)
 type GoogleFc = {
-  callbackQueue?: Array<Record<string, () => void>>
+  callbackQueue?: GoogleFcCallback[]
   showRevocationMessage?: () => void
 }
 
@@ -78,8 +79,9 @@ export function MonetizationProvider({ children }: { children: ReactNode }) {
   }, [status])
 
   const openPrivacyChoices = useCallback(() => {
-    if (!window.googlefc?.showRevocationMessage) return false
-    window.googlefc.showRevocationMessage()
+    const googlefc = window.googlefc
+    if (!googlefc?.callbackQueue || !googlefc.showRevocationMessage) return false
+    googlefc.callbackQueue.push(googlefc.showRevocationMessage)
     return true
   }, [])
 
